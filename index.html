@@ -782,9 +782,26 @@
 </head>
 <body>
 
+  <!-- Login Overlay -->
+  <div class="login-overlay" id="loginOverlay">
+    <div class="login-box">
+      <h2>&#128172; Telegram Post Bot</h2>
+      <p>Log in with Telegram to start posting</p>
+      <div id="telegramLoginBtn">
+        <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-login="ABTESTABOT" data-size="large" data-radius="10" data-onauth="onTelegramAuth(user)"></script>
+      </div>
+      <p id="loginError" style="color:var(--red);font-size:12px;margin-top:12px;display:none;"></p>
+    </div>
+  </div>
+
   <div class="sidebar">
   <div class="sidebar-header">
     <h1><span class="logo">&#9881;</span> Post Builder</h1>
+    <div class="user-badge" id="userBadge" style="display:none;margin-top:8px;">
+      <span class="dot"></span>
+      <span id="userInfo">Connected</span>
+      <button class="logout" id="logoutBtn">Logout</button>
+    </div>
     <div class="tabs">
       <button class="tab active" data-tab="new">+ New</button>
       <button class="tab" data-tab="saved">&#128190; Saved</button>
@@ -1409,10 +1426,13 @@
 
   // ---- API state ----
   const API = new URLSearchParams(location.search).get('api') || '';
+  let session = localStorage.getItem('tg_session') || '';
 
   async function api(path, opts = {}) {
-    opts.headers = { 'Content-Type': 'application/json', ...opts.headers };
-    const r = await fetch(API + path, { ...opts, headers: opts.headers });
+    opts.headers = opts.headers || {};
+    if (session) opts.headers['session'] = session;
+    const hdrs = { 'Content-Type': 'application/json', ...opts.headers };
+    const r = await fetch(API + path, { ...opts, headers: hdrs });
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'API error');
     return data;
@@ -1430,11 +1450,57 @@
     } catch { document.getElementById('chatSelectorWrap').style.display = 'none'; }
   }
 
-  loadChats();
+  function onTelegramAuth(user) {
+    fetch(API + '/api/auth/telegram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(user),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        session = data.session;
+        localStorage.setItem('tg_session', session);
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('userBadge').style.display = 'flex';
+        document.getElementById('userInfo').textContent = data.user_id ? 'Logged in (ID: ' + data.user_id + ')' : 'Connected';
+        loadChats();
+        showToast('Logged in!');
+      } else {
+        document.getElementById('loginError').textContent = 'Login failed.';
+        document.getElementById('loginError').style.display = 'block';
+      }
+    })
+    .catch(e => {
+      document.getElementById('loginError').textContent = 'Login failed: ' + (e.message || 'Unknown error');
+      document.getElementById('loginError').style.display = 'block';
+    });
+  }
+
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    session = '';
+    localStorage.removeItem('tg_session');
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.getElementById('userBadge').style.display = 'none';
+    document.getElementById('chatSelectorWrap').style.display = 'none';
+    showToast('Logged out');
+  });
+
+  if (session) {
+    loadChats().then(() => {
+      document.getElementById('loginOverlay').style.display = 'none';
+      document.getElementById('userBadge').style.display = 'flex';
+      document.getElementById('userInfo').textContent = 'Connected';
+    }).catch(() => {
+      localStorage.removeItem('tg_session');
+      session = '';
+    });
+  }
 
   document.getElementById('sendBtn').addEventListener('click', async () => {
     const chatId = document.getElementById('chatSelect').value;
     if (!chatId) { showToast('Please select a chat first.'); return; }
+    if (!session) { showToast('Please log in first.'); return; }
     const text = getMsgHTML();
     const buttons = getButtonsData();
     const keyboard = buildTelegramKeyboard(buttons);

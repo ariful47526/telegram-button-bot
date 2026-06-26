@@ -1,8 +1,12 @@
 import os, pathlib
 import asyncio
 import logging
+import hashlib
+import hmac
+import secrets
+import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -19,7 +23,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN not set in .env file")
 
+ALLOWED_USERS = [int(x.strip()) for x in os.getenv("ALLOWED_USER_IDS", "").split(",") if x.strip()]
 bot_chats: dict[int, dict] = {}
+authorized_sessions: dict[str, int] = {}
 
 async def track_chats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member:
@@ -73,12 +79,55 @@ class SendRequest(BaseModel):
     reply_markup: dict | None = None
     media: str | None = None
 
+def _require_session(session: str) -> int:
+    if not session or session not in authorized_sessions:
+        raise HTTPException(401, "Unauthorized")
+    return authorized_sessions[session]
+
+def verify_telegram_auth(data: dict) -> int | None:
+    hash_received = data.pop("hash", None)
+    if not hash_received:
+        return None
+    items = sorted((k, v) for k, v in data.items() if v)
+    data_check_string = "\n".join(f"{k}={v}" for k, v in items)
+    secret_key = hmac.new("WebAppData".encode(), BOT_TOKEN.encode(), hashlib.sha256).digest()
+    computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if computed_hash != hash_received:
+        return None
+    if int(data.get("auth_date", 0)) < time.time() - 86400:
+        return None
+    return int(data["id"])
+
+class TelegramAuthRequest(BaseModel):
+    id: int
+    first_name: str = ""
+    last_name: str = ""
+    username: str = ""
+    photo_url: str = ""
+    auth_date: int
+    hash: str
+
+@app.post("/api/auth/telegram")
+async def telegram_auth(req: TelegramAuthRequest):
+    user_id = verify_telegram_auth(req.model_dump())
+    if not user_id:
+        raise HTTPException(401, "Invalid or expired auth data")
+    if ALLOWED_USERS and user_id not in ALLOWED_USERS:
+        raise HTTPException(403, "You are not authorized to use this app")
+    session = secrets.token_hex(16)
+    authorized_sessions[session] = user_id
+    return {"ok": True, "session": session, "user_id": user_id}
+
 @app.get("/api/chats")
-async def get_chats():
+async def get_chats(session: str = Header(default="")):
+    _require_session(session)
     return {"ok": True, "chats": list(bot_chats.values())}
 
 @app.post("/api/send")
-async def send_post(req: SendRequest):
+async def send_post(req: SendRequest, session: str = Header(default="")):
+    user_id = _require_session(session)
+    if ALLOWED_USERS and user_id not in ALLOWED_USERS:
+        raise HTTPException(403, "Not allowed to send")
     try:
         app_bot = Application.builder().token(BOT_TOKEN).build()
         await app_bot.initialize()

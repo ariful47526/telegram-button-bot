@@ -39,6 +39,29 @@ A Telegram bot with a web dashboard for visually building and sending posts with
 
 5. Open **http://localhost:8000** in a browser and start building posts.
 
+## Authentication
+
+The web app uses **Telegram Login** for authentication. When you open the app, you'll see a "Log in with Telegram" button. Clicking it opens Telegram to verify your identity.
+
+### Setup (one-time)
+
+1. Open **@BotFather** on Telegram
+2. Send `/setdomain`
+3. Select your bot
+4. Enter the domain where the app is hosted (e.g., `ariful47526.github.io` or your custom domain)
+
+This authorizes the Telegram Login Widget on your domain. Without this step, the login button won't work.
+
+### Running locally
+
+If you're running the backend on `localhost:8000` and accessing the frontend via GitHub Pages, append `?api=http://localhost:8000` to the Pages URL:
+
+```
+https://ariful47526.github.io/telegram-button-bot/?api=http://localhost:8000
+```
+
+Alternatively, just open `http://localhost:8000` directly (the server serves both frontend and API).
+
 ## GitHub Pages
 
 The frontend is also available on **GitHub Pages** at:
