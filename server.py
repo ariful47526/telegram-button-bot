@@ -103,6 +103,7 @@ class TelegramAuthRequest(BaseModel):
     first_name: str = ""
     last_name: str = ""
     username: str = ""
+    phone_number: str = ""
     photo_url: str = ""
     auth_date: int
     hash: str

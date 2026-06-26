@@ -1448,41 +1448,23 @@
     } catch { document.getElementById('chatSelectorWrap').style.display = 'none'; }
   }
 
-  // Render Telegram Login widget dynamically
+  // Render Telegram OAuth widget dynamically (requests phone number)
   (function() {
-    const redirectUrl = window.location.origin + window.location.pathname;
     const s = document.createElement('script');
     s.async = true;
-    s.src = 'https://telegram.org/js/telegram-widget.js?22';
-    s.setAttribute('data-telegram-login', 'ABTESTABOT');
-    s.setAttribute('data-size', 'large');
-    s.setAttribute('data-radius', '10');
-    s.setAttribute('data-auth-url', redirectUrl);
+    s.src = 'https://oauth.telegram.org/js/telegram-login.js?5';
+    s.setAttribute('data-client-id', '8694662365');
+    s.setAttribute('data-onauth', 'onTelegramAuth(data)');
+    s.setAttribute('data-request-access', 'write phone');
     document.getElementById('telegramLoginBtn').appendChild(s);
   })();
 
   // Handle Telegram auth callback (data comes as URL query params)
-  function handleTelegramCallback() {
-    const params = new URLSearchParams(location.search);
-    const hash = params.get('hash');
-    if (!hash) return;
-    const user = {
-      id: parseInt(params.get('id')),
-      first_name: params.get('first_name') || '',
-      last_name: params.get('last_name') || '',
-      username: params.get('username') || '',
-      photo_url: params.get('photo_url') || '',
-      auth_date: parseInt(params.get('auth_date') || '0'),
-      hash: hash,
-    };
-    if (!user.id) return;
-    // Clean URL immediately
-    window.history.replaceState({}, '', window.location.origin + window.location.pathname + (API ? '?api=' + encodeURIComponent(API) : ''));
-    // Send to backend
+  function onTelegramAuth(data) {
     fetch(API + '/api/auth/telegram', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(user),
+      body: JSON.stringify(data),
     })
     .then(r => r.json())
     .then(data => {
@@ -1504,8 +1486,6 @@
       document.getElementById('loginError').style.display = 'block';
     });
   }
-
-  handleTelegramCallback();
 
   document.getElementById('logoutBtn').addEventListener('click', () => {
     session = '';
