@@ -39,6 +39,27 @@ A Telegram bot with a web dashboard for visually building and sending posts with
 
 5. Open **http://localhost:8000** in a browser and start building posts.
 
+## GitHub Pages
+
+The frontend is also available on **GitHub Pages** at:
+
+```
+https://ariful47526.github.io/telegram-button-bot/
+```
+
+To connect it to your running backend, add `?api=BACKEND_URL` to the URL, e.g.:
+
+```
+https://ariful47526.github.io/telegram-button-bot/?api=http://localhost:8000
+```
+
+## Docker
+
+```bash
+docker build -t tg-button-bot .
+docker run -p 8000:8000 -e BOT_TOKEN=your_token -e CHAT_ID=your_chat_id tg-button-bot
+```
+
 ## Commands
 
 | Command | Description |

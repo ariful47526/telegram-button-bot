@@ -1408,7 +1408,7 @@
   });
 
   // ---- API state ----
-  const API = 'http://localhost:8000';
+  const API = new URLSearchParams(location.search).get('api') || '';
 
   async function api(path, opts = {}) {
     opts.headers = { 'Content-Type': 'application/json', ...opts.headers };
